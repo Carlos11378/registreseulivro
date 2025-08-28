@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registre Seu Livro</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body {font-family: Arial, sans-serif; margin:0; background: linear-gradient(to right, #6a11cb, #2575fc); color: #fff;}
+  .container {max-width: 600px; margin: auto; padding: 20px; background: rgba(0,0,0,0.5); border-radius: 10px; margin-top:50px;}
+  input, button {width: 100%; padding: 10px; margin:5px 0; border-radius: 5px; border:none;}
+  button {background: #ff8c00; color:#fff; font-weight:bold; cursor:pointer;}
+  button:hover {background:#e07b00;}
+  h1,h2 {text-align:center;}
+  ul {list-style: none; padding:0;}
+  li {margin-bottom:5px; display:flex; justify-content: space-between; align-items: center;}
+  .estatisticas {margin-top:20px; text-align:center;}
+</style>
+</head>
+<body>
+<div class="container" id="loginContainer">
+  <h1>Registre Seu Livro</h1>
+  <h2>Entrada da Senha</h2>
+  <input type="password" id="senhaEntrada" placeholder="Digite a senha">
+  <button onclick="verificarSenha()">Entrar</button>
+  <p>Para adquirir a senha: pagar R$10,00 via Pix: <strong>litteralinea@gmail.com</strong> e enviar comprovante via WhatsApp <strong>21 998364995</strong>.</p>
+  <p id="erroSenha" style="color:red;"></p>
+</div>
+
+<div class="container" id="cadastroContainer" style="display:none;">
+  <h2>Cadastro / Login</h2>
+  <input type="text" id="nome" placeholder="Nome">
+  <input type="password" id="senha" placeholder="Senha">
+  <button onclick="cadastrarLeitor()">Cadastrar</button>
+  <button onclick="loginLeitor()">Entrar</button>
+  <p id="erroCadastro" style="color:red;"></p>
+</div>
+
+<div class="container" id="livrosContainer" style="display:none;">
+  <h2>Cadastro de Livros</h2>
+  <input type="text" id="titulo" placeholder="Título do livro">
+  <input type="text" id="autor" placeholder="Autor">
+  <input type="text" id="editora" placeholder="Editora">
+  <input type="date" id="inicio">
+  <input type="date" id="fim">
+  <button onclick="salvarLivro()">Salvar</button>
+  <button onclick="limparCampos()">Limpar</button>
+  <button onclick="sair()" style="background:#ff3333;">Sair</button>
+  <div class="estatisticas">
+    <p id="estatMes">Livros lidos no mês: 0</p>
+    <p id="estatAno">Livros lidos no ano: 0</p>
+  </div>
+  <canvas id="graficoLivros" style="background:#fff; border-radius:10px; margin-top:20px;"></canvas>
+  <h3>Livros cadastrados:</h3>
+  <ul id="listaLivros"></ul>
+</div>
+
+<script>
+const senhaCorreta = 'BOOKLEITOR2345';
+let leitorAtual = null;
+let livros = JSON.parse(localStorage.getItem('livros')) || [];
+let leitores = JSON.parse(localStorage.getItem('leitores')) || [];
+let chart = null;
+
+function verificarSenha() {
+  const entrada = document.getElementById('senhaEntrada').value;
+  if(entrada === senhaCorreta){
+    document.getElementById('loginContainer').style.display='none';
+    document.getElementById('cadastroContainer').style.display='block';
+  } else {
+    document.getElementById('erroSenha').innerText='Senha incorreta!';
+  }
+}
+
+function cadastrarLeitor(){
+  const nome = document.getElementById('nome').value;
+  const senha = document.getElementById('senha').value;
+  if(!nome || !senha){document.getElementById('erroCadastro').innerText='Nome e senha obrigatórios'; return;}
+  if(leitores.find(l=>l.nome===nome)){document.getElementById('erroCadastro').innerText='Usuário já existe'; return;}
+  leitores.push({nome,senha});
+  localStorage.setItem('leitores',JSON.stringify(leitores));
+  leitorAtual = {nome,senha};
+  abrirLivros();
+}
+
+function loginLeitor(){
+  const nome = document.getElementById('nome').value;
+  const senha = document.getElementById('senha').value;
+  const user = leitores.find(l=>l.nome===nome && l.senha===senha);
+  if(user){
+    leitorAtual=user;
+    abrirLivros();
+  } else {
+    document.getElementById('erroCadastro').innerText='Usuário ou senha incorretos';
+  }
+}
+
+function abrirLivros(){
+  document.getElementById('cadastroContainer').style.display='none';
+  document.getElementById('livrosContainer').style.display='block';
+  atualizarLista();
+}
+
+function salvarLivro(){
+  const livro = {
+    titulo: document.getElementById('titulo').value,
+    autor: document.getElementById('autor').value,
+    editora: document.getElementById('editora').value,
+    inicio: document.getElementById('inicio').value,
+    fim: document.getElementById('fim').value,
+    leitor: leitorAtual.nome
+  };
+  if(!livro.titulo){alert('Título é obrigatório'); return;}
+  livros.push(livro);
+  localStorage.setItem('livros', JSON.stringify(livros));
+  limparCampos();
+  atualizarLista();
+}
+
+function limparCampos(){
+  document.getElementById('titulo').value='';
+  document.getElementById('autor').value='';
+  document.getElementById('editora').value='';
+  document.getElementById('inicio').value='';
+  document.getElementById('fim').value='';
+}
+
+function sair(){
+  leitorAtual=null;
+  document.getElementById('livrosContainer').style.display='none';
+  document.getElementById('loginContainer').style.display='block';
+  document.getElementById('senhaEntrada').value='';
+}
+
+function deletarLivro(index){
+  livros.splice(index,1);
+  localStorage.setItem('livros', JSON.stringify(livros));
+  atualizarLista();
+}
+
+function atualizarLista(){
+  const lista = document.getElementById('listaLivros');
+  lista.innerHTML='';
+  const livrosLeitor = livros.filter(l=>l.leitor===leitorAtual.nome);
+  livrosLeitor.forEach((l,i)=>{
+    const li = document.createElement('li');
+    li.innerHTML = `${l.titulo} - ${l.autor} (${l.inicio} → ${l.fim}) <button onclick=\"deletarLivro(${i})\" style=\"background:red;color:#fff;width:auto;padding:2px 5px;margin-left:5px;border-radius:3px;\">Delete</button>`;
+    lista.appendChild(li);
+  });
+  // Estatísticas
+  const mesAtual = new Date().getMonth();
+  const anoAtual = new Date().getFullYear();
+  const totalMes = livrosLeitor.filter(l=>new Date(l.fim).getMonth()===mesAtual).length;
+  const totalAno = livrosLeitor.filter(l=>new Date(l.fim).getFullYear()===anoAtual).length;
+  document.getElementById('estatMes').innerText=`Livros lidos no mês: ${totalMes}`;
+  document.getElementById('estatAno').innerText=`Livros lidos no ano: ${totalAno}`;
+
+  // Gráfico
+  const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const dadosMeses = Array(12).fill(0);
+  livrosLeitor.forEach(l=>{
+    const m = new Date(l.fim).getMonth();
+    dadosMeses[m]++;
+  });
+  if(chart) chart.destroy();
+  const ctx = document.getElementById('graficoLivros').getContext('2d');
+  chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: meses,
+      datasets: [{label:'Livros lidos por mês', data: dadosMeses, backgroundColor:'rgba(255,140,0,0.7)'}]
+    },
+    options:{responsive:true, plugins:{legend:{display:true}}}
+  });
+}
+</script>
+</body>
+</html>
